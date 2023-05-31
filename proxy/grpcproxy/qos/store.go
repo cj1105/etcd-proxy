@@ -30,8 +30,8 @@ type Subject struct {
 }
 
 type QoSRule struct {
-	RuleName    string   `json:"rule_name,omitempty"`
-	RuleType    string   `json:"rule_type,omitempty"`
+	RuleName    string   `json:"ruleName,omitempty"`
+	RuleType    string   `json:"ruleType,omitempty"`
 	Subject     *Subject `json:"subject,omitempty"`
 	Qps         uint64   `json:"qps,omitempty"`
 	Threshold   uint64   `json:"threshold,omitempty"`
@@ -225,6 +225,9 @@ func getQoSRule(lg *zap.Logger, c *clientv3.Client, ruleName string) *QoSRule {
 	if resp, err := c.Get(context.TODO(), ruleName, clientv3.WithLimit(1)); err != nil {
 		return nil
 	} else {
+		if len(resp.Kvs) == 0 {
+			return nil
+		}
 		err = json.Unmarshal(resp.Kvs[0].Value, &rule)
 		if err != nil {
 			return nil
@@ -234,7 +237,7 @@ func getQoSRule(lg *zap.Logger, c *clientv3.Client, ruleName string) *QoSRule {
 }
 
 func getAllQoSRules(lg *zap.Logger, c *clientv3.Client) ([]*QoSRule, error) {
-	resp, err := c.Get(context.TODO(), qosRuleBucketName, clientv3.WithPrefix())
+	resp, err := c.Get(context.TODO(), qosRuleBucketName, clientv3.WithFromKey())
 	if err != nil {
 		return nil, err
 	}
@@ -273,9 +276,15 @@ func (qs *Qos) IsQoSEnabled() bool {
 }
 
 // NewQoSStore creates a new qosStore.
-func NewQoSStore(lg *zap.Logger, c *clientv3.Client) *Qos {
+func NewQoSStore(lg *zap.Logger, c *clientv3.Client, mode string) *Qos {
 	if lg == nil {
 		lg = zap.NewNop()
+	}
+	if mode == "client" {
+		return &Qos{
+			lg: lg,
+			c:  c,
+		}
 	}
 	enabled := false
 	resp, err := c.Get(context.TODO(), enableFlagKey)

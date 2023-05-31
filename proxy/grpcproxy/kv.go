@@ -35,7 +35,7 @@ func NewKvProxy(lg *zap.Logger, c *clientv3.Client) (pb.KVServer, <-chan struct{
 	kv := &kvProxy{
 		kv:    c.KV,
 		cache: cache.NewCache(cache.DefaultMaxEntries),
-		qos:   qos.NewQoSStore(lg, c),
+		qos:   qos.NewQoSStore(lg, c, "server"),
 		lg:    lg,
 	}
 	donec := make(chan struct{})
