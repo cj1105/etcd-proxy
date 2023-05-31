@@ -16,6 +16,8 @@ package grpcproxy
 
 import (
 	"context"
+	"github.com/cj1105/etcd-proxy/proxy/grpcproxy/qos"
+	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/v3"
@@ -25,12 +27,16 @@ import (
 type kvProxy struct {
 	kv    clientv3.KV
 	cache cache.Cache
+	qos   *qos.Qos
+	lg    *zap.Logger
 }
 
-func NewKvProxy(c *clientv3.Client) (pb.KVServer, <-chan struct{}) {
+func NewKvProxy(lg *zap.Logger, c *clientv3.Client) (pb.KVServer, <-chan struct{}) {
 	kv := &kvProxy{
 		kv:    c.KV,
 		cache: cache.NewCache(cache.DefaultMaxEntries),
+		qos:   qos.NewQoSStore(lg, c),
+		lg:    lg,
 	}
 	donec := make(chan struct{})
 	close(donec)
@@ -38,6 +44,12 @@ func NewKvProxy(c *clientv3.Client) (pb.KVServer, <-chan struct{}) {
 }
 
 func (p *kvProxy) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResponse, error) {
+	object := &qos.RequestContext{GRPCMethod: "Range", Key: string(r.Key)}
+	if !p.qos.GetToken(object) {
+		p.lg.Warn("failed to Range due to rate limit", zap.String("key", string(r.Key)))
+		return nil, qos.ErrQoSRateExceeded
+	}
+	defer p.qos.PutToken(object)
 	if r.Serializable {
 		resp, err := p.cache.Get(r)
 		switch err {

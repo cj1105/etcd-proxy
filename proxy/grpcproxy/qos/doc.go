@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package tcpproxy is an OSI level 4 proxy for routing etcd clients to etcd servers.
-package tcpproxy
+// Package qos provides client qos management for accessing keys in etcd.
+package qos

@@ -430,7 +430,7 @@ func newGRPCProxyServer(lg *zap.Logger, client *clientv3.Client) *grpc.Server {
 		client.KV, _, _ = leasing.NewKV(client, grpcProxyLeasing)
 	}
 
-	kvp, _ := grpcproxy.NewKvProxy(client)
+	kvp, _ := grpcproxy.NewKvProxy(lg, client)
 	watchp, _ := grpcproxy.NewWatchProxy(client.Ctx(), lg, client)
 	if grpcProxyResolverPrefix != "" {
 		grpcproxy.Register(lg, client, grpcProxyResolverPrefix, grpcProxyAdvertiseClientURL, grpcProxyResolverTTL)
