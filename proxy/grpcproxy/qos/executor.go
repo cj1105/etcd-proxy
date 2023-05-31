@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/antonmedv/expr"
-	"go.etcd.io/etcd/api/v3/qospb"
 	"strings"
 
 	"go.uber.org/zap"
@@ -35,7 +34,7 @@ var (
 )
 
 type RuleExecutor interface {
-	Run(r *qospb.QoSRule, Env map[string]interface{}) (bool, error)
+	Run(r *QoSRule, Env map[string]interface{}) (bool, error)
 
 	Name() string
 }
@@ -62,7 +61,7 @@ func NewExprRuleExecutor(lg *zap.Logger, name string) RuleExecutor {
 	return &exprRuleExecutor{lg: lg, name: name}
 }
 
-func (ee *exprRuleExecutor) Run(r *qospb.QoSRule, env map[string]interface{}) (bool, error) {
+func (ee *exprRuleExecutor) Run(r *QoSRule, env map[string]interface{}) (bool, error) {
 	code, err := expr.Compile(r.Condition, expr.Env(env))
 	if err != nil {
 		ee.lg.Warn("failed to compile code", zap.String("condition", r.Condition), zap.Error(err))
@@ -89,7 +88,7 @@ func NewGRPCMethodRuleExecutor(lg *zap.Logger, name string) RuleExecutor {
 	return &gRPCMethodRuleExecutor{lg: lg, name: name}
 }
 
-func (ee *gRPCMethodRuleExecutor) Run(r *qospb.QoSRule, env map[string]interface{}) (bool, error) {
+func (ee *gRPCMethodRuleExecutor) Run(r *QoSRule, env map[string]interface{}) (bool, error) {
 	gRPCMethod := env["gRPCMethod"].(string)
 	key, ok := env["key"].(string)
 	if !ok {
@@ -117,7 +116,7 @@ func NewCompareRuleExecutor(lg *zap.Logger, name string) RuleExecutor {
 	return &cmpThresholdRuleExecutor{lg: lg, name: name}
 }
 
-func (ce *cmpThresholdRuleExecutor) Run(r *qospb.QoSRule, env map[string]interface{}) (bool, error) {
+func (ce *cmpThresholdRuleExecutor) Run(r *QoSRule, env map[string]interface{}) (bool, error) {
 	key, ok := env["key"].(string)
 	if !ok {
 		return false, ErrEnvLackOfKey
