@@ -486,6 +486,7 @@ func mustHTTPListener(lg *zap.Logger, m cmux.CMux, tlsinfo *transport.TLSInfo, c
 	grpcproxy.HandleProxyMetrics(httpmux)
 	grpcproxy.HandleProxyHealth(lg, httpmux, proxy)
 	grpcproxy.HandleQosRuleConfig(lg, httpmux, proxy)
+	grpcproxy.HandleNamespaceQuotaConfig(lg, httpmux, proxy)
 	if grpcProxyEnablePprof {
 		for p, h := range debugutil.PProfHandlers() {
 			httpmux.Handle(p, h)

@@ -16,12 +16,12 @@ package grpcproxy
 
 import (
 	"context"
+	"github.com/cj1105/etcd-proxy/proxy/grpcproxy/namespacequota"
 	"github.com/cj1105/etcd-proxy/proxy/grpcproxy/qos"
-	"go.uber.org/zap"
-
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/proxy/grpcproxy/cache"
+	"go.uber.org/zap"
 )
 
 type kvProxy struct {
@@ -29,6 +29,7 @@ type kvProxy struct {
 	cache cache.Cache
 	qos   *qos.Qos
 	lg    *zap.Logger
+	nqm   namespacequota.NamespaceQuotaManager
 }
 
 func NewKvProxy(lg *zap.Logger, c *clientv3.Client) (pb.KVServer, <-chan struct{}) {
@@ -37,6 +38,9 @@ func NewKvProxy(lg *zap.Logger, c *clientv3.Client) (pb.KVServer, <-chan struct{
 		cache: cache.NewCache(cache.DefaultMaxEntries),
 		qos:   qos.NewQoSStore(lg, c, "server"),
 		lg:    lg,
+		nqm: namespacequota.NewNamespaceQuotaManager(lg, c, namespacequota.NamespaceQuotaManagerConfig{
+			NamespaceQuotaEnforcement: 2,
+		}, ""),
 	}
 	donec := make(chan struct{})
 	close(donec)
@@ -82,8 +86,15 @@ func (p *kvProxy) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeRespo
 func (p *kvProxy) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {
 	p.cache.Invalidate(r.Key, nil)
 	cacheKeys.Set(float64(p.cache.Size()))
-
+	byteDiff, keyDiff := p.nqm.DiffNamespaceQuotaUsage(r.Key, r.Value)
+	if p.nqm.IsQuotaExceeded(string(r.Key), byteDiff, keyDiff) {
+		return nil, namespacequota.ErrNamespaceQuotaExceeded
+	}
+	if keyDiff == 1 {
+		byteDiff += len(r.Key)
+	}
 	resp, err := p.kv.Do(ctx, PutRequestToOp(r))
+	p.nqm.UpdateNamespaceQuotaUsage(string(r.Key), byteDiff, keyDiff)
 	return (*pb.PutResponse)(resp.Put()), err
 }
 

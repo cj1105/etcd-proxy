@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -222,7 +223,7 @@ func (qs *Qos) QoSRuleList() ([]*QoSRule, error) {
 
 func getQoSRule(lg *zap.Logger, c *clientv3.Client, ruleName string) *QoSRule {
 	var rule QoSRule
-	if resp, err := c.Get(context.TODO(), ruleName, clientv3.WithLimit(1)); err != nil {
+	if resp, err := c.Get(context.TODO(), strings.Join([]string{qosRuleBucketName, ruleName}, "/"), clientv3.WithLimit(1)); err != nil {
 		return nil
 	} else {
 		if len(resp.Kvs) == 0 {
@@ -237,7 +238,7 @@ func getQoSRule(lg *zap.Logger, c *clientv3.Client, ruleName string) *QoSRule {
 }
 
 func getAllQoSRules(lg *zap.Logger, c *clientv3.Client) ([]*QoSRule, error) {
-	resp, err := c.Get(context.TODO(), qosRuleBucketName, clientv3.WithFromKey())
+	resp, err := c.Get(context.TODO(), qosRuleBucketName, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +263,7 @@ func putQoSRule(lg *zap.Logger, c *clientv3.Client, rule *QoSRule) {
 	if err != nil {
 		lg.Panic("failed to unmarshal 'qospb.QoSRule'", zap.Error(err))
 	}
-	c.Put(context.TODO(), rule.RuleName, string(ruleStr))
+	c.Put(context.TODO(), strings.Join([]string{qosRuleBucketName, rule.RuleName}, "/"), string(ruleStr))
 }
 
 func delQoSRule(c *clientv3.Client, ruleName string) {
